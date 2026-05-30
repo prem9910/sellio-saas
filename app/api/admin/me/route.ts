@@ -16,10 +16,24 @@ export async function GET() {
     }
 
     const adminEmail = process.env.ADMIN_EMAIL;
-    if (adminEmail && user.email === adminEmail) {
+
+    // Primary check: email match against ADMIN_EMAIL env var
+    if (adminEmail && user.email?.toLowerCase() === adminEmail.toLowerCase()) {
+      // Ensure admin user exists in DB (password login bypasses /auth/callback)
+      await prisma.user.upsert({
+        where: { id: user.id },
+        update: { email: user.email ?? "", isAdmin: true },
+        create: {
+          id: user.id,
+          email: user.email ?? "",
+          name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? "Admin",
+          isAdmin: true,
+        },
+      });
       return NextResponse.json({ isAdmin: true });
     }
 
+    // Fallback: check DB flag
     const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
     return NextResponse.json({ isAdmin: !!dbUser?.isAdmin });
   } catch {

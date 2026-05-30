@@ -1,11 +1,22 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin";
+import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  await requireAdmin();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const isAdmin = adminEmail && user.email?.toLowerCase() === adminEmail.toLowerCase();
+  if (!isAdmin) {
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+    if (!dbUser?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
 
   const [users, stores, automations, payments] = await Promise.all([
     prisma.user.findMany({
@@ -78,4 +89,8 @@ export async function GET() {
     monthlyRevenue,
     allUsers,
   });
+  } catch (err) {
+    console.error("Admin stats error:", err);
+    return NextResponse.json({ error: "Failed to load stats", detail: String(err) }, { status: 500 });
+  }
 }

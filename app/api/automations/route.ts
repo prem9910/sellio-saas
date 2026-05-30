@@ -1,20 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
-  type: z.enum([
-    "ABANDONED_CART",
-    "LOW_STOCK_ALERT",
-    "WEEKLY_REPORT",
-    "AUTO_REPLY",
-    "ORDER_FOLLOWUP",
-    "REVIEW_REQUEST",
-  ]),
+  type: z.enum(["ABANDONED_CART","LOW_STOCK_ALERT","WEEKLY_REPORT","AUTO_REPLY","ORDER_FOLLOWUP","REVIEW_REQUEST"]),
   storeId: z.string(),
   trigger: z.record(z.string(), z.unknown()),
   action: z.record(z.string(), z.unknown()),
@@ -22,14 +14,12 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = (session.user as { id: string }).id;
   const automations = await prisma.automation.findMany({
-    where: { userId },
+    where: { userId: user.id },
     include: { store: true, logs: { take: 5, orderBy: { createdAt: "desc" } } },
     orderBy: { createdAt: "desc" },
   });
@@ -38,25 +28,20 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = (session.user as { id: string }).id;
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const automation = await prisma.automation.create({
     data: {
       name: parsed.data.name,
       type: parsed.data.type,
       storeId: parsed.data.storeId,
-      userId,
+      userId: user.id,
       status: parsed.data.status ?? "ACTIVE",
       trigger: parsed.data.trigger as object,
       action: parsed.data.action as object,

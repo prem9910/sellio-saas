@@ -20,7 +20,7 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError("");
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -31,11 +31,12 @@ export default function AdminLoginPage() {
       return;
     }
 
-    // Check if user is admin
-    const res = await fetch("/api/admin/me");
-    const data = await res.json();
+    // Check admin by comparing email directly — avoids server cookie timing issues
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? "";
+    const loggedInEmail = authData.user?.email ?? "";
+    const isAdmin = adminEmail && loggedInEmail.toLowerCase() === adminEmail.toLowerCase();
 
-    if (data.isAdmin) {
+    if (isAdmin) {
       router.push("/admin");
     } else {
       await supabase.auth.signOut();

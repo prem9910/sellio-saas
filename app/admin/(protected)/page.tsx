@@ -38,15 +38,20 @@ const statusColors: Record<string, string> = {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/admin/stats")
       .then((r) => r.json())
       .then((d) => {
-        setStats(d);
+        if (d.error) {
+          setError(d.detail ?? d.error);
+        } else {
+          setStats(d);
+        }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((e) => { setError(String(e)); setLoading(false); });
   }, []);
 
   if (loading) {
@@ -58,6 +63,19 @@ export default function AdminDashboard() {
             <div key={i} className="glass-card rounded-xl p-6 animate-pulse h-28" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="glass-card rounded-xl p-6">
+        <p className="text-sm font-semibold mb-2" style={{ color: "#EF4444" }}>Failed to load stats</p>
+        <pre className="text-xs overflow-auto" style={{ color: "var(--text-muted)" }}>{error}</pre>
+        <p className="text-xs mt-3" style={{ color: "var(--text-muted)" }}>
+          Run <code className="px-1 py-0.5 rounded" style={{ background: "var(--bg-card)" }}>npx prisma migrate dev</code> or{" "}
+          <code className="px-1 py-0.5 rounded" style={{ background: "var(--bg-card)" }}>npx prisma db push</code> to apply the latest schema changes.
+        </p>
       </div>
     );
   }

@@ -13,10 +13,24 @@ model User {
   name               String?
   image              String?
   plan               Plan         @default(FREE)
+  isAdmin            Boolean      @default(false)
   razorpayCustomerId String?
   createdAt          DateTime     @default(now())
   automations        Automation[]
   stores             Store[]
+  payments           Payment[]
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  plan       Plan
+  amount     Int
+  currency   String   @default("INR")
+  status     String
+  razorpayId String?
+  createdAt  DateTime @default(now())
 }
 
 model Store {

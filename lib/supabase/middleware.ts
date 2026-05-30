@@ -30,6 +30,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const url = request.nextUrl.clone();
+
+  // Let all /admin routes be handled by the admin layout / requireAdmin()
+  if (url.pathname.startsWith("/admin")) {
+    return supabaseResponse;
+  }
+
   const isAuthPage =
     url.pathname === "/login" || url.pathname === "/signup";
   const isDashboard = url.pathname.startsWith("/dashboard") ||

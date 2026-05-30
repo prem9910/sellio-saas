@@ -1,0 +1,117 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 String       @id @default(cuid())
+  email              String       @unique
+  name               String?
+  image              String?
+  emailVerified      DateTime?
+  plan               Plan         @default(FREE)
+  razorpayCustomerId String?
+  createdAt          DateTime     @default(now())
+  accounts           Account[]
+  sessions           Session[]
+  automations        Automation[]
+  stores             Store[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Store {
+  id          String       @id @default(cuid())
+  name        String
+  platform    String
+  url         String
+  apiKey      String?
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  automations Automation[]
+  createdAt   DateTime     @default(now())
+}
+
+model Automation {
+  id        String         @id @default(cuid())
+  name      String
+  type      AutomationType
+  status    Status         @default(ACTIVE)
+  trigger   Json
+  action    Json
+  runCount  Int            @default(0)
+  lastRun   DateTime?
+  userId    String
+  storeId   String
+  user      User           @relation(fields: [userId], references: [id])
+  store     Store          @relation(fields: [storeId], references: [id])
+  logs      AutomationLog[]
+  createdAt DateTime       @default(now())
+}
+
+model AutomationLog {
+  id           String     @id @default(cuid())
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id])
+  status       String
+  message      String
+  createdAt    DateTime   @default(now())
+}
+
+enum Plan {
+  FREE
+  STARTER
+  GROWTH
+  PRO
+}
+
+enum Status {
+  ACTIVE
+  PAUSED
+  DRAFT
+}
+
+enum AutomationType {
+  ABANDONED_CART
+  LOW_STOCK_ALERT
+  WEEKLY_REPORT
+  AUTO_REPLY
+  ORDER_FOLLOWUP
+  REVIEW_REQUEST
+}
